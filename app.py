@@ -1,52 +1,61 @@
+"""
+ENABLE AccessiBot – Evidence-led Testing Assistant (Groq-Powered)
+
+Uses Groq's free API with Llama 3 — no local downloads, no payment needed.
+"""
+
 import os
 import json
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context
 from flask_cors import CORS
 from dotenv import load_dotenv
+from groq import Groq
 
-# Load environment variables from .env (e.g. FEEDBACK_PATH)
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests from the frontend (index.html)
+CORS(app)
 
-# Path to the JSONL evidence log file – can be overridden via .env
 FEEDBACK_PATH = os.getenv("FEEDBACK_PATH", "feedback.jsonl")
+GROQ_API_KEY  = os.getenv("GROQ_API_KEY", "")
 
+try:
+    client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
+except Exception:
+    client = None
 
-# ───────────────────────────────────────────
-# UTILITIES
-# Helper functions used across all routes
-# ───────────────────────────────────────────
+# ─────────────────────────────────────────────
+# ENABLE System Prompt
+# ─────────────────────────────────────────────
 
-def utc_now_iso() -> str:
-    """Return current UTC time in ISO 8601 format for evidence timestamps."""
-    return datetime.now(timezone.utc).isoformat()
+ENABLE_SYSTEM_PROMPT = """You are ENABLE AccessiBot, an AI accessibility testing assistant for the ENABLE project at the University of Bradford (UoB).
 
-def safe_load_json(request_obj):
-    """Safely parse JSON from a Flask request; return empty dict on failure."""
-    try:
-        return request_obj.get_json(force=True) or {}
-    except Exception:
-        return {}
+ENABLE stands for: Empowering Neurodiverse and Accessible Breakthroughs in Learning Environments.
 
-def append_jsonl(path: str, record: dict) -> None:
-    """
-    Append one JSON record to the evidence log file (one record per line).
-    Always stamps with a UTC timestamp if not already present.
-    """
-    record.setdefault("ts", utc_now_iso())
-    with open(path, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+Your purpose is to guide testers (students, teaching staff, IT staff) through structured accessibility and neurodiversity testing of UoB systems — primarily the UoB Intranet and EPMS (Engineering, Physical and Mathematical Sciences) systems. Evidence collected feeds into proposals delivered to the AIRE (AI Research) group.
 
+The four ENABLE project objectives are:
+1. Empowering all software actors through student inner understanding, creative skills, abilities and communication of challenges.
+2. Diversity & inclusion: being first-hand users and co-creators while sharing challenges, expectations and skills.
+3. Innovation: all team members enjoy the roles of creators and leaders of their own challenges.
+4. Co-creation: editing solutions for improving existing HE IT systems, refining approaches to EDI challenges.
 
-# ───────────────────────────────────────────
-# SCENARIO DEFINITIONS
-# Four structured EPMS testing scenarios.
-# Each has a title and a list of step-by-step
-# instructions shown to the tester on request.
-# ───────────────────────────────────────────
+Testing scenarios you support:
+- S1: Find EPMS course/module information — test at 200% zoom, keyboard-only navigation, menu/text clarity
+- S2: Use intranet search to find a staff/contact page — test high contrast mode, focus indicators
+- S3: Download a document (PDF) — check link text clarity, alternative formats, vision barriers
+- S4: Complete a simple intranet navigation task — check for neuro-overload, unclear labels, misleading navigation
+
+Accessibility dimensions you help test:
+- Vision: zoom (200%), high contrast, colour blindness, screen reader compatibility
+- Hearing: captions, transcripts, audio alternatives
+- Motor: keyboard-only navigation, target sizes, focus indicators
+- Neurodiversity: cognitive load, clarity of language, layout overload, predictability, ADHD/dyslexia/autism considerations
+
+Always be warm, supportive, and encouraging. Use plain, clear language. Keep responses concise — testers are working in parallel tabs.
+When asked for scenario steps, give clearly numbered, actionable steps.
+"""
 
 SCENARIOS = {
     "S1": {
@@ -88,132 +97,98 @@ SCENARIOS = {
     },
 }
 
+# ─────────────────────────────────────────────
+# Utilities
+# ─────────────────────────────────────────────
 
-# ───────────────────────────────────────────
-# RULE-BASED KEYWORD REPLIES
-# Simple keyword matching for common queries.
-# No external AI is used in the current version.
-# Hugging Face integration is planned for v2.
-# ───────────────────────────────────────────
+def utc_now_iso():
+    return datetime.now(timezone.utc).isoformat()
 
-RULE_REPLIES = [
-    (["hello", "hi", "hey"],
-     "Hi 👋 Tell me what you're testing today (role + scenario), and I'll guide you."),
+def safe_load_json(request_obj):
+    try:
+        return request_obj.get_json(force=True) or {}
+    except Exception:
+        return {}
 
-    (["bye", "goodbye"],
-     "No problem — thanks for testing. If you spot more barriers, log them and we'll build a clear evidence list."),
+def append_jsonl(path, record):
+    record.setdefault("ts", utc_now_iso())
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-    (["what is enable", "enable project"],
-     "ENABLE is about collecting evidence and co-creating more accessible, relaxed learning software — starting with UoB systems like the intranet."),
-
-    (["vision", "zoom", "contrast", "colour"],
-     "For vision testing: try 200% zoom, high contrast, and check if layout breaks or text becomes hard to follow."),
-
-    (["hearing", "captions"],
-     "For hearing needs: check if videos/audio have captions or transcripts. If not, log it as a barrier."),
-
-    (["neuro", "adhd", "autism", "dyslexia", "overwhelm"],
-     "For neurodiversity: watch for overload (too much text, unclear labels, confusing navigation). Log what caused it and what would help."),
-]
-
-
-def offline_reply(message: str, session: dict | None = None) -> str:
-    """
-    Generate a guidance reply using offline rule-based logic.
-
-    Priority order:
-      1. If the message asks for scenario steps, return the step list.
-      2. Check RULE_REPLIES for keyword matches.
-      3. Fall back to a context-aware prompt asking the tester
-         to describe what they are doing.
-
-    No network calls are made. This is the current production behaviour.
-    Hugging Face API integration is planned for the final version.
-    """
-    msg = (message or "").strip()
-    low = msg.lower()
-
-    # 1 – Return scenario steps if the tester asks for them
-    scenario = (session or {}).get("scenario")
-    if scenario and scenario in SCENARIOS and (
-        "start" in low or "scenario" in low or "steps" in low
-    ):
+def offline_reply(message, session=None):
+    low = (message or "").lower()
+    scenario = (session or {}).get("scenario", "S1")
+    if scenario in SCENARIOS and any(k in low for k in ["start", "steps", "guide", "how", "what do i"]):
         sc = SCENARIOS[scenario]
         lines = [f"Scenario {scenario}: {sc['title']}", "", "Quick steps:"]
         for i, step in enumerate(sc["steps"], start=1):
             lines.append(f"{i}) {step}")
-        lines.append("")
-        lines.append(
-            "When you find a barrier, click 'Report issue' and describe "
-            "what happened + what you expected."
-        )
+        lines.append("\nWhen you find a barrier, click 'Report issue' and describe what happened.")
         return "\n".join(lines)
-
-    # 2 – Keyword match
-    for keys, reply in RULE_REPLIES:
-        if any(k in low for k in keys):
-            return reply
-
-    # 3 – Context-aware default prompt
     role = (session or {}).get("role", "tester")
-    system = (session or {}).get("system", "UoB system")
-    scenario_text = (
-        scenario + " – " + SCENARIOS[scenario]["title"]
-        if scenario in SCENARIOS
-        else "a scenario"
-    )
     return (
-        f"Okay — you're acting as: {role}.\n"
-        f"System under test: {system}.\n"
-        f"Scenario: {scenario_text}.\n\n"
+        f"Hi {role}! I'm running in offline mode (no API key found in .env).\n"
         "Tell me:\n"
         "- What page/task are you doing right now?\n"
-        "- Are you testing zoom, contrast, keyboard-only, captions, or focus mode?\n"
+        "- Which accessibility check are you using?\n"
         "- What felt restrictive or confusing?"
     )
 
+def build_user_message(message, session):
+    scenario_id    = session.get("scenario", "S1")
+    scenario_title = SCENARIOS.get(scenario_id, {}).get("title", scenario_id)
+    return (
+        f"[Tester context]\n"
+        f"Role: {session.get('role', 'Unknown')}\n"
+        f"System under test: {session.get('system', 'UoB Intranet')}\n"
+        f"Scenario: {scenario_id} – {scenario_title}\n\n"
+        f"[Tester message]\n{message}"
+    )
 
-# ───────────────────────────────────────────
-# ROUTES
-# ───────────────────────────────────────────
+# ─────────────────────────────────────────────
+# Routes
+# ─────────────────────────────────────────────
 
 @app.route("/health", methods=["GET"])
 def health():
-    """
-    Health check endpoint.
-    The frontend polls this on load to confirm the backend is running.
-    Returns: JSON { status, mode, feedback_path }
-    """
     return jsonify({
         "status": "ok",
-        "mode": "offline",
+        "mode": "ai" if client else "offline",
+        "model": "llama3-8b-8192 (Groq)" if client else "none",
         "feedback_path": FEEDBACK_PATH
     })
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    """
-    Chat endpoint – receives a tester message and returns an offline reply.
-
-    Expected JSON body:
-      { "message": "...", "session": { "role": "...", "system": "...", "scenario": "..." } }
-
-    Also appends a chat_message record to the evidence log.
-    Returns: JSON { reply: "..." }
-    """
-    data = safe_load_json(request)
+    data    = safe_load_json(request)
     message = (data.get("message") or "").strip()
     session = data.get("session") or {}
+    history = data.get("history") or []
 
-    # Reject empty messages
     if not message:
         return jsonify({"reply": "I didn't catch that — can you type it again?"})
 
-    # Generate offline reply (rule-based, no external API)
-    reply = offline_reply(message, session=session)
+    messages = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
+    for turn in history[-10:]:
+        if turn.get("role") in ("user", "assistant") and turn.get("content"):
+            messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": build_user_message(message, session)})
 
-    # Log the chat exchange as evidence (non-critical – failure is silent)
+    if client:
+        try:
+            response = client.chat.completions.create(
+                model="llama3-8b-8192",
+                max_tokens=600,
+                messages=messages,
+            )
+            reply = response.choices[0].message.content.strip()
+        except Exception as e:
+            reply = offline_reply(message, session=session)
+            reply += f"\n\n(AI temporarily unavailable: {str(e)[:80]})"
+    else:
+        reply = offline_reply(message, session=session)
+
     try:
         append_jsonl(FEEDBACK_PATH, {
             "type": "chat_message",
@@ -222,59 +197,86 @@ def chat():
             "reply": reply,
         })
     except Exception:
-        pass  # Still respond even if logging fails
+        pass
 
     return jsonify({"reply": reply})
 
 
+@app.route("/chat/stream", methods=["POST"])
+def chat_stream():
+    data    = safe_load_json(request)
+    message = (data.get("message") or "").strip()
+    session = data.get("session") or {}
+    history = data.get("history") or []
+
+    if not message:
+        def err():
+            yield "data: I didn't catch that.\n\n"
+        return Response(stream_with_context(err()), content_type="text/event-stream")
+
+    messages = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
+    for turn in history[-10:]:
+        if turn.get("role") in ("user", "assistant") and turn.get("content"):
+            messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": build_user_message(message, session)})
+
+    def generate():
+        full_reply = ""
+        if client:
+            try:
+                stream = client.chat.completions.create(
+                    model="llama3-8b-8192",
+                    max_tokens=600,
+                    messages=messages,
+                    stream=True,
+                )
+                for chunk in stream:
+                    token = chunk.choices[0].delta.content or ""
+                    if token:
+                        full_reply_ref = token
+                        yield f"data: {json.dumps({'token': token})}\n\n"
+            except Exception as e:
+                fallback = offline_reply(message, session=session)
+                yield f"data: {json.dumps({'token': fallback})}\n\n"
+                full_reply = fallback
+        else:
+            fallback = offline_reply(message, session=session)
+            yield f"data: {json.dumps({'token': fallback})}\n\n"
+            full_reply = fallback
+
+        yield f"data: {json.dumps({'done': True})}\n\n"
+
+        try:
+            append_jsonl(FEEDBACK_PATH, {
+                "type": "chat_message",
+                "session": session,
+                "message": message,
+                "reply": full_reply,
+            })
+        except Exception:
+            pass
+
+    return Response(stream_with_context(generate()), content_type="text/event-stream")
+
+
 @app.route("/feedback", methods=["POST"])
 def feedback():
-    """
-    Evidence logging endpoint.
-    Receives any structured event from the frontend and appends it to the
-    JSONL log. Supported event types:
-      task_start | task_finish | issue_report | quick_feedback | scenario_change
-
-    Expected JSON body:
-      { "type": "...", "session": {...}, "payload": {...} }
-
-    Returns: JSON { ok: true }
-    """
     data = safe_load_json(request)
-    record_type = (data.get("type") or "feedback").strip()
-
     record = {
-        "type": record_type,
+        "type": (data.get("type") or "feedback").strip(),
         "session": data.get("session") or {},
         "payload": data.get("payload") or {},
         "ts": utc_now_iso(),
     }
-
     append_jsonl(FEEDBACK_PATH, record)
     return jsonify({"ok": True})
 
 
 @app.route("/feedback/summary", methods=["GET"])
 def feedback_summary():
-    """
-    Summary endpoint – reads the JSONL log and returns aggregate counts.
-    Grouped by: event type, issue category, and severity level.
-    Used for quick analysis of collected evidence.
-
-    Returns: JSON {
-      total, by_type: {...}, by_category: {...}, by_severity: {...}
-    }
-    """
-    summary = {
-        "total": 0,
-        "by_type": {},
-        "by_category": {},
-        "by_severity": {},
-    }
-
+    summary = {"total": 0, "by_type": {}, "by_category": {}, "by_severity": {}}
     if not os.path.exists(FEEDBACK_PATH):
         return jsonify(summary)
-
     with open(FEEDBACK_PATH, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -285,49 +287,27 @@ def feedback_summary():
                 obj = json.loads(line)
             except Exception:
                 continue
-
-            # Count by event type
             t = obj.get("type", "unknown")
             summary["by_type"][t] = summary["by_type"].get(t, 0) + 1
-
-            # Count by issue category and severity (from issue_report payloads)
             payload = obj.get("payload") or {}
             cat = payload.get("category")
             sev = payload.get("severity")
-
             if cat:
                 summary["by_category"][cat] = summary["by_category"].get(cat, 0) + 1
             if sev:
                 summary["by_severity"][sev] = summary["by_severity"].get(sev, 0) + 1
-
     return jsonify(summary)
 
 
 @app.route("/feedback/download", methods=["GET"])
 def feedback_download():
-    """
-    Download endpoint – serves the full JSONL evidence log as a file attachment.
-    If the file does not exist yet, an empty file is created first.
-    Used by the frontend Export Evidence button when the backend is running.
-    """
     if not os.path.exists(FEEDBACK_PATH):
-        # Create empty file so the endpoint does not error
         open(FEEDBACK_PATH, "a", encoding="utf-8").close()
+    return send_file(FEEDBACK_PATH, as_attachment=True, download_name=os.path.basename(FEEDBACK_PATH))
 
-    return send_file(
-        FEEDBACK_PATH,
-        as_attachment=True,
-        download_name=os.path.basename(FEEDBACK_PATH)
-    )
-
-
-# ───────────────────────────────────────────
-# ENTRY POINT
-# Run with: python app.py
-# Then open index.html in Chrome or Edge.
-# ───────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("\n✅ ENABLE AccessiBot backend running at http://127.0.0.1:5000")
-    print("Open index.html in your browser to use the testing tool.\n")
+    mode = "AI — llama3-8b-8192 via Groq" if client else "OFFLINE (set GROQ_API_KEY in .env)"
+    print(f"\n✅ ENABLE AccessiBot running at http://127.0.0.1:5000")
+    print(f"   Mode: {mode}\n")
     app.run(debug=True, port=5000)
