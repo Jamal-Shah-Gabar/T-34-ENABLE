@@ -1,1 +1,587 @@
 
+/* ───────────────────────────────────────────
+   1. CSS VARIABLES
+   All colours, font, and sizing tokens live
+   here. Accessibility modes override these.
+─────────────────────────────────────────── */
+:root {
+  --bg:        #0f1117;
+  --bg2:       #171b26;
+  --bg3:       #1f2433;
+  --border:    #2e3450;
+  --accent:    #6ee7b7;
+  --accent2:   #38bdf8;
+  --text:      #e2e8f0;
+  --text-dim:  #8896b3;
+  --bot-bub:   #1e2d3d;
+  --user-bub:  #1a3a2e;
+  --danger:    #f87171;
+  --warn:      #fbbf24;
+  --radius:    14px;
+  --font:      'Sora', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-size: 16px;
+  --speed:     0.22s;
+}
+
+/* ───────────────────────────────────────────
+   2. ACCESSIBILITY MODE OVERRIDES
+   These body classes are toggled by the sidebar
+   buttons in script.js. They override CSS
+   variables so all components update instantly.
+
+   high-contrast  – yellow-on-black scheme
+   dyslexia-font  – Comic Sans with wider spacing
+   focus-mode     – fades sidebar to reduce distraction
+─────────────────────────────────────────── */
+
+body.high-contrast {
+  --bg:        #000;
+  --bg2:       #111;
+  --bg3:       #1a1a1a;
+  --border:    #fff;
+  --accent:    #ff0;
+  --accent2:   #0ff;
+  --text:      #fff;
+  --text-dim:  #ccc;
+  --bot-bub:   #001a00;
+  --user-bub:  #001a33;
+}
+
+body.dyslexia-font {
+  --font: 'Comic Sans MS', 'Chalkboard SE', cursive;
+  letter-spacing: 0.05em;
+  word-spacing:   0.1em;
+  line-height:    1.9;
+}
+
+body.focus-mode .sidebar { opacity: 0.2; pointer-events: none; }
+body.focus-mode .chat-header { display: none; }
+
+/* ───────────────────────────────────────────
+   3. RESET AND BASE STYLES
+─────────────────────────────────────────── */
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { font-size: var(--font-size); scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  overflow: hidden;
+  transition: background var(--speed), color var(--speed);
+}
+
+/* ───────────────────────────────────────────
+   4. SKIP LINK
+   Hidden off-screen, becomes visible on focus.
+   Required for keyboard and screen reader users
+   (WCAG 2.4.1 – Bypass Blocks).
+─────────────────────────────────────────── */
+
+/* Skip link */
+.skip-link {
+  position: absolute;
+  top: -100px;
+  left: 1rem;
+  background: var(--accent);
+  color: #000;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  z-index: 9999;
+  transition: top 0.2s;
+  text-decoration: none;
+}
+.skip-link:focus { top: 1rem; }
+
+/* ───────────────────────────────────────────
+   5. LAYOUT SHELL
+   Full-viewport flex container holding the
+   sidebar and chat panel side by side.
+─────────────────────────────────────────── */
+
+/* Shell */
+.app-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* ───────────────────────────────────────────
+   6. SIDEBAR
+   Fixed-width panel containing all accessibility
+   control buttons (vision, hearing, motor).
+   In focus-mode, opacity drops to 20%.
+─────────────────────────────────────────── */
+
+/* Sidebar */
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  transition: opacity var(--speed);
+  padding-bottom: 1rem;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.2rem 1.2rem 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.5rem;
+}
+.brand-icon { font-size: 1.5rem; color: var(--accent); }
+.brand-name { font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; }
+
+.control-group {
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.group-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 0.25rem;
+}
+
+.ctrl-btn {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.45rem 0.75rem;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--speed), border-color var(--speed), color var(--speed);
+}
+.ctrl-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.ctrl-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ctrl-btn.active { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+.ctrl-btn.danger { color: var(--danger); border-color: var(--danger); }
+.ctrl-btn.danger:hover { background: var(--danger); color: #000; }
+
+.ctrl-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+.ctrl-select {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  font-family: var(--font);
+  font-size: 0.82rem;
+  cursor: pointer;
+  width: 100%;
+}
+.ctrl-select:focus-visible { outline: 2px solid var(--accent); }
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 0.8rem 1rem 0;
+}
+
+/* ───────────────────────────────────────────
+   7. CHAT HEADER AND SESSION BAR
+─────────────────────────────────────────── */
+
+/* Chat panel */
+.chat-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1.5rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+.header-left { display: flex; align-items: center; gap: 0.5rem; }
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+.tag {
+  font-size: 0.72rem;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 0.2rem 0.65rem;
+  color: var(--accent2);
+}
+
+/* Session bar */
+.session-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 0.9rem 1.2rem 0.7rem;
+}
+
+.session-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.4fr 1.2fr;
+  gap: 0.7rem;
+  align-items: end;
+}
+
+.session-field label {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+
+.session-field select {
+  width: 100%;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--font);
+}
+
+.session-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.mini-btn {
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: border-color var(--speed), background var(--speed), color var(--speed);
+}
+.mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mini-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mini-btn.warn { border-color: var(--warn); color: var(--warn); }
+.mini-btn.warn:hover { background: rgba(251,191,36,0.08); }
+
+.session-meta {
+  margin-top: 0.6rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+}
+.session-meta .dot { opacity: 0.7; }
+
+/* ───────────────────────────────────────────
+   8. CHAT MESSAGES AND BUBBLES
+   Scrollable log of bot and user messages.
+   Each message has an avatar + bubble layout.
+   aria-live="polite" is set in HTML for screen readers.
+─────────────────────────────────────────── */
+
+/* Messages */
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.2rem 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  scroll-behavior: smooth;
+}
+.chat-messages:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+
+.message {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  animation: fadeUp 0.25s ease both;
+}
+@keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.message.user { flex-direction: row-reverse; }
+
+.avatar {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.message.user .avatar {
+  background: var(--user-bub);
+  color: var(--accent2);
+  border-color: var(--accent2);
+}
+
+.bubble {
+  max-width: 70%;
+  background: var(--bot-bub);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+.bubble p + p { margin-top: 0.5rem; }
+
+.message.user .bubble {
+  background: var(--user-bub);
+  border-color: #2a4a38;
+  text-align: right;
+}
+
+/* Feedback buttons under bot messages */
+.msg-actions {
+  margin-top: 0.6rem;
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.action-chip {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.action-chip:hover { border-color: var(--accent); color: var(--accent); }
+.action-chip.warn:hover { border-color: var(--warn); color: var(--warn); }
+
+/* Typing indicator */
+.typing-dots { display: flex; gap: 5px; align-items: center; padding: 0.2rem 0; }
+.typing-dots span {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: blink 1.2s infinite;
+}
+.typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+.typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+  0%,80%,100% { opacity: 0.2; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* ───────────────────────────────────────────
+   9. CAPTION BAR
+   Shown below the chat when captions are on.
+   Displays the last bot reply as text.
+   Supports users with hearing impairments.
+─────────────────────────────────────────── */
+
+/* Caption bar */
+.caption-bar {
+  background: rgba(0,0,0,0.85);
+  color: #fff;
+  font-size: 0.88rem;
+  padding: 0.5rem 1.5rem;
+  border-top: 1px solid var(--border);
+  min-height: 36px;
+  font-style: italic;
+}
+
+/* ───────────────────────────────────────────
+   10. CHAT INPUT AREA
+   Textarea + send button fixed at the bottom
+   of the chat panel. Textarea auto-grows.
+─────────────────────────────────────────── */
+
+/* Input area */
+.chat-input-area {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.6rem;
+  padding: 0.9rem 1.2rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+.chat-textarea {
+  flex: 1;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.65rem 0.9rem;
+  font-family: var(--font);
+  font-size: 0.9rem;
+  resize: none;
+  min-height: 44px;
+  max-height: 160px;
+  overflow-y: auto;
+  line-height: 1.5;
+  transition: border-color var(--speed);
+}
+.chat-textarea:focus { outline: none; border-color: var(--accent); }
+.chat-textarea::placeholder { color: var(--text-dim); }
+
+.send-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 10px;
+  width: 44px; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--speed), transform var(--speed);
+}
+.send-btn svg { width: 18px; height: 18px; stroke: #000; }
+.send-btn:hover { background: var(--accent2); transform: scale(1.05); }
+.send-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.send-btn:active { transform: scale(0.96); }
+
+/* ───────────────────────────────────────────
+   11. ISSUE REPORT MODAL
+   Centred dialog for logging accessibility
+   barriers. Uses role="dialog" and aria-modal
+   in HTML. ESC key closes it (see script.js).
+─────────────────────────────────────────── */
+
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  z-index: 2000;
+}
+
+.modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: min(620px, calc(100vw - 2rem));
+  transform: translate(-50%, -50%);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  z-index: 2100;
+  box-shadow: 0 25px 70px rgba(0,0,0,0.45);
+}
+
+.modal-head {
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.modal-head h2 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.modal-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.form-row label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-bottom: 0.3rem;
+}
+.form-row input, .form-row select, .form-row textarea {
+  width: 100%;
+  background: var(--bg3);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-family: var(--font);
+  font-size: 0.9rem;
+}
+.form-row textarea { resize: vertical; }
+
+.form-row.two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+
+.form-actions { display: flex; justify-content: flex-end; }
+
+.tiny-note {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* ───────────────────────────────────────────
+   12. SCROLLBAR
+─────────────────────────────────────────── */
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ───────────────────────────────────────────
+   13. RESPONSIVE BREAKPOINTS
+   Below 900px: session grid collapses to 2 cols.
+   Below 700px: sidebar hides, chat fills screen.
+─────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  .session-grid { grid-template-columns: 1fr 1fr; }
+  .session-actions { justify-content: flex-start; }
+}
+
+@media (max-width: 700px) {
+  .sidebar { display: none; }
+  .chat-panel { width: 100%; }
+  .form-row.two { grid-template-columns: 1fr; }
+}
+
+
+/* ───────────────────────────────────────────
+   14. REDUCED MOTION (WCAG 2.2 – 2.3.3)
+   Disables animations and transitions for users
+   who have enabled "Reduce Motion" in their OS
+   accessibility settings. This covers the
+   message fade-in, typing dots, and status pulse.
+─────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration:   0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration:  0.01ms !important;
+  }
+}
