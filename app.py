@@ -100,6 +100,13 @@ SCENARIOS = {
 # ─────────────────────────────────────────────
 # Utilities
 # ─────────────────────────────────────────────
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "Server is running ✅"
 
 def utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
