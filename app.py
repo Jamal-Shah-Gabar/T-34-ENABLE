@@ -6,11 +6,10 @@ Uses Groq's free API with Llama 3 — no local downloads, no payment needed.
 import os
 import json
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify, send_file, Response, stream_with_context
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 from groq import Groq
-from flask import render_template
 
 load_dotenv()
 
@@ -30,73 +29,49 @@ except Exception:
 # ENABLE System Prompt
 # ─────────────────────────────────────────────
 
-ENABLE_SYSTEM_PROMPT = """You are ENABLE AccessiBot, an AI accessibility testing assistant for the ENABLE project at the University of Bradford (UoB).
+ENABLE_SYSTEM_PROMPT = """You are ENABLE AccessiBot, a warm and knowledgeable AI accessibility testing assistant for the ENABLE project at the University of Bradford (UoB).
 
 ENABLE stands for: Empowering Neurodiverse and Accessible Breakthroughs in Learning Environments.
 
-Your purpose is to guide testers (students, teaching staff, IT staff) through structured accessibility and neurodiversity testing of UoB systems — primarily the UoB Intranet and EPMS (Engineering, Physical and Mathematical Sciences) systems. Evidence collected feeds into proposals delivered to the AIRE (AI Research) group.
+Your purpose is to guide testers (students, teaching staff, IT staff) through structured accessibility and neurodiversity testing of UoB digital systems — primarily the UoB Intranet and EPMS (Engineering, Physical and Mathematical Sciences) platform. Evidence collected feeds into redesign proposals delivered to the AIRE (AI Research) group.
 
-The four ENABLE project objectives are:
-1. Empowering all software actors through student inner understanding, creative skills, abilities and communication of challenges.
+== PROJECT OBJECTIVES ==
+1. Empowering all software actors (students, teaching and IT staff) through creative skills, inner understanding and communication of challenges.
 2. Diversity & inclusion: being first-hand users and co-creators while sharing challenges, expectations and skills.
 3. Innovation: all team members enjoy the roles of creators and leaders of their own challenges.
-4. Co-creation: editing solutions for improving existing HE IT systems, refining approaches to EDI challenges.
+4. Co-creation: editing solutions to improve existing HE IT systems, refining approaches to EDI (Equality, Diversity and Inclusion) challenges.
 
-Testing scenarios you support:
-- S1: Find EPMS course/module information — test at 200% zoom, keyboard-only navigation, menu/text clarity
-- S2: Use intranet search to find a staff/contact page — test high contrast mode, focus indicators
-- S3: Download a document (PDF) — check link text clarity, alternative formats, vision barriers
-- S4: Complete a simple intranet navigation task — check for neuro-overload, unclear labels, misleading navigation
+== TESTING SCENARIOS ==
+You know the following four scenarios in detail and can guide testers through any of them dynamically:
 
-Accessibility dimensions you help test:
-- Vision: zoom (200%), high contrast, colour blindness, screen reader compatibility
-- Hearing: captions, transcripts, audio alternatives
-- Motor: keyboard-only navigation, target sizes, focus indicators
-- Neurodiversity: cognitive load, clarity of language, layout overload, predictability, ADHD/dyslexia/autism considerations
+S1 — Find EPMS course/module information:
+Guide the tester to find a course or module page on the UoB intranet. Ask them to test at 200% browser zoom and check if menus, text and layout still work. Ask them to try keyboard-only navigation using Tab and Enter. Help them notice if anything breaks, disappears or becomes hard to reach.
 
-Always be warm, supportive, and encouraging. Use plain, clear language. Keep responses concise — testers are working in parallel tabs.
-When asked for scenario steps, give clearly numbered, actionable steps.
+S2 — Use intranet search to find a staff or contact page:
+Guide the tester to use the intranet search to find a staff profile or contact info. Ask them to enable high contrast mode in their OS or browser. Help them check the focus indicator — when tabbing through the page, can they clearly see which element is focused? Note any confusing or misleading search results.
+
+S3 — Download a document (PDF) and check clarity:
+Guide the tester to find a PDF document link on the intranet. At 200% zoom, is the link text clear and descriptive (e.g. "2024 Module Guide PDF" vs just "click here")? If the PDF is scanned/image-based, it won't work with screen readers — log that. Check if alternative formats (Word, HTML) are offered.
+
+S4 — Complete a simple intranet navigation task:
+Guide the tester to navigate to a simple destination (e.g. timetable, student support, forms) using as few steps as possible. Pay attention to: confusing labels, too many options at once, inconsistent navigation, anything that causes mental overload. This scenario focuses on neurodiversity — cognitive load, clarity, predictability.
+
+== ACCESSIBILITY DIMENSIONS ==
+Help testers notice and report issues across four areas:
+- Vision: zoom behaviour, contrast, colour blindness, screen reader support
+- Hearing: missing captions, missing transcripts, no audio alternatives
+- Motor: keyboard-only navigation, click target sizes, focus indicators
+- Neurodiversity: cognitive overload, unclear language, unpredictable layouts, ADHD/dyslexia/autism considerations
+
+== HOW TO RESPOND ==
+- Be warm, encouraging and patient. Testers may themselves have the accessibility needs they are testing for.
+- Use plain, clear language. Avoid jargon unless you explain it.
+- Keep responses focused and concise — testers are working in a second browser tab simultaneously.
+- When a tester asks for steps or guidance for a scenario, give them clear numbered steps tailored to their role and the system they are testing.
+- When a tester reports an issue, help them: categorise it (Vision/Hearing/Motor/Neurodiversity), assess its severity (Minor/Major/Blocker), describe what happened vs what was expected, and suggest a concrete improvement.
+- If a tester seems confused or overwhelmed, simplify your response.
+- Always frame your guidance in the context of the ENABLE project — collecting evidence to drive real change in HE accessibility.
 """
-
-SCENARIOS = {
-    "S1": {
-        "title": "Find EPMS course/module information",
-        "steps": [
-            "Open the UoB intranet in another tab.",
-            "Try to find a course/module page (EPMS).",
-            "Test at 200% zoom. Check if menus and text still work.",
-            "Try keyboard-only (Tab/Enter). Can you reach everything?",
-            "If anything blocks you, click 'Report issue' and log it."
-        ],
-    },
-    "S2": {
-        "title": "Use intranet search to find a staff/contact page",
-        "steps": [
-            "Use search on the intranet to find a staff profile or contact info.",
-            "Test high contrast mode.",
-            "Check focus indicator: can you see where you are when tabbing?",
-            "If results are confusing/misleading, log it as an issue (clarity)."
-        ],
-    },
-    "S3": {
-        "title": "Download a document (PDF) and check clarity",
-        "steps": [
-            "Find a document link (PDF) on the intranet.",
-            "At 200% zoom, check if the link text is clear and descriptive.",
-            "If the PDF is scanned or hard to read, log it (vision).",
-            "If there's no alternative format, log it as a barrier."
-        ],
-    },
-    "S4": {
-        "title": "Complete a simple intranet task (navigation)",
-        "steps": [
-            "Pick a simple destination page (e.g., timetable, support, forms).",
-            "Try to reach it with minimal steps.",
-            "Check if labels are clear and not misleading.",
-            "If you feel overloaded or lost, log it (neurodiversity/clarity)."
-        ],
-    },
-}
 
 # ─────────────────────────────────────────────
 # Utilities
@@ -116,43 +91,40 @@ def append_jsonl(path, record):
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
-def offline_reply(message, session=None):
-    low = (message or "").lower()
+def offline_reply(session=None):
+    role     = (session or {}).get("role", "tester")
     scenario = (session or {}).get("scenario", "S1")
-    if scenario in SCENARIOS and any(k in low for k in ["start", "steps", "guide", "how", "what do i"]):
-        sc = SCENARIOS[scenario]
-        lines = [f"Scenario {scenario}: {sc['title']}", "", "Quick steps:"]
-        for i, step in enumerate(sc["steps"], start=1):
-            lines.append(f"{i}) {step}")
-        lines.append("\nWhen you find a barrier, click 'Report issue' and describe what happened.")
-        return "\n".join(lines)
-    role = (session or {}).get("role", "tester")
     return (
-        f"Hi {role}! I'm running in offline mode (no API key found in .env).\n"
-        "Tell me:\n"
-        "- What page/task are you doing right now?\n"
-        "- Which accessibility check are you using?\n"
-        "- What felt restrictive or confusing?"
-    )
-
-def build_user_message(message, session):
-    scenario_id    = session.get("scenario", "S1")
-    scenario_title = SCENARIOS.get(scenario_id, {}).get("title", scenario_id)
-    return (
-        f"[Tester context]\n"
-        f"Role: {session.get('role', 'Unknown')}\n"
-        f"System under test: {session.get('system', 'UoB Intranet')}\n"
-        f"Scenario: {scenario_id} – {scenario_title}\n\n"
-        f"[Tester message]\n{message}"
+        f"Hi {role}! I'm currently running in offline mode — the AI connection isn't configured yet.\n\n"
+        f"You have selected scenario {scenario}. "
+        "To get full AI guidance, please make sure the GROQ_API_KEY environment variable is set on the server.\n\n"
+        "In the meantime, you can still log accessibility issues using the 'Report issue' button."
     )
 
 def build_messages(history, message, session):
-    """Build the full message list for Groq."""
+    """Build the full message list for Groq, injecting session context."""
+    scenario_labels = {
+        "S1": "S1 – Find EPMS course/module information",
+        "S2": "S2 – Use intranet search to find a staff/contact page",
+        "S3": "S3 – Download a document (PDF) and check clarity",
+        "S4": "S4 – Complete a simple intranet navigation task",
+    }
+    scenario_id    = session.get("scenario", "S1")
+    scenario_label = scenario_labels.get(scenario_id, scenario_id)
+
+    contextualised = (
+        f"[Session context]\n"
+        f"My role: {session.get('role', 'Student')}\n"
+        f"System I am testing: {session.get('system', 'UoB Intranet')}\n"
+        f"Current scenario: {scenario_label}\n\n"
+        f"[My message]\n{message}"
+    )
+
     msgs = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
     for turn in history[-10:]:
         if turn.get("role") in ("user", "assistant") and turn.get("content"):
             msgs.append({"role": turn["role"], "content": turn["content"]})
-    msgs.append({"role": "user", "content": build_user_message(message, session)})
+    msgs.append({"role": "user", "content": contextualised})
     return msgs
 
 # ─────────────────────────────────────────────
@@ -161,7 +133,9 @@ def build_messages(history, message, session):
 
 @app.route("/")
 def home():
+    # Serve index.html from templates/ folder
     return render_template("index.html")
+
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -169,7 +143,7 @@ def health():
         "status": "ok",
         "mode": "ai" if client else "offline",
         "model": "llama3-8b-8192 (Groq)" if client else "none",
-        "feedback_path": FEEDBACK_PATH
+        "ai_ready": client is not None,
     })
 
 
@@ -191,12 +165,14 @@ def chat():
                 messages=build_messages(history, message, session),
             )
             reply = response.choices[0].message.content.strip()
-print("AI reply:", reply)
+            print(f"[AI] replied ok, length={len(reply)}", flush=True)
         except Exception as e:
-            reply = offline_reply(message, session=session)
-            reply += f"\n\n(AI temporarily unavailable: {str(e)[:80]})"
+            print(f"[AI ERROR] {e}", flush=True)
+            reply = offline_reply(session=session)
+            reply += f"\n\n(AI error: {str(e)[:120]})"
     else:
-        reply = offline_reply(message, session=session)
+        print("[WARN] No Groq client — GROQ_API_KEY not set", flush=True)
+        reply = offline_reply(session=session)
 
     try:
         append_jsonl(FEEDBACK_PATH, {
@@ -240,22 +216,20 @@ def chat_stream():
                 for chunk in stream:
                     token = chunk.choices[0].delta.content or ""
                     if token:
-                        full_reply_local = token  # noqa — just for reference
                         full_reply += token
                         yield "data: " + json.dumps({"token": token}) + "\n\n"
             except Exception as e:
-                fallback = offline_reply(message, session=session)
+                print(f"[STREAM ERROR] {e}", flush=True)
+                fallback = offline_reply(session=session)
                 full_reply = fallback
                 yield "data: " + json.dumps({"token": fallback}) + "\n\n"
         else:
-            fallback = offline_reply(message, session=session)
+            fallback = offline_reply(session=session)
             full_reply = fallback
             yield "data: " + json.dumps({"token": fallback}) + "\n\n"
 
-        # Signal stream end
         yield "data: " + json.dumps({"done": True}) + "\n\n"
 
-        # Log evidence
         try:
             append_jsonl(FEEDBACK_PATH, {
                 "type": "chat_message",
@@ -313,14 +287,12 @@ def feedback_summary():
 def feedback_download():
     if not os.path.exists(FEEDBACK_PATH):
         open(FEEDBACK_PATH, "a", encoding="utf-8").close()
-    return send_file(FEEDBACK_PATH, as_attachment=True, download_name=os.path.basename(FEEDBACK_PATH))
+    return send_file(FEEDBACK_PATH, as_attachment=True, download_name="enable_evidence.jsonl")
 
 
 if __name__ == "__main__":
-    mode = "AI — llama3-8b-8192 via Groq ✦" if client else "OFFLINE (add GROQ_API_KEY to .env)"
+    mode = "AI — llama3-8b-8192 via Groq ✦" if client else "OFFLINE (GROQ_API_KEY not set)"
     port = int(os.environ.get("PORT", 10000))
-
     print(f"\n✅ ENABLE AccessiBot running on port {port}")
-    print(f"   Mode: {mode}\n")
-
+    print(f"   Mode: {mode}\n", flush=True)
     app.run(host="0.0.0.0", port=port)
