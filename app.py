@@ -317,6 +317,9 @@ def feedback_download():
 
 if __name__ == "__main__":
     mode = "AI — llama3-8b-8192 via Groq ✦" if client else "OFFLINE (add GROQ_API_KEY to .env)"
-    print(f"\n✅ ENABLE AccessiBot running at http://127.0.0.1:5000")
+    port = int(os.environ.get("PORT", 10000))
+
+    print(f"\n✅ ENABLE AccessiBot running on port {port}")
     print(f"   Mode: {mode}\n")
-    app.run(debug=True, port=5000)
+
+    app.run(host="0.0.0.0", port=port)
