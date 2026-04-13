@@ -10,6 +10,7 @@ from flask import Flask, request, jsonify, send_file, Response, stream_with_cont
 from flask_cors import CORS
 from dotenv import load_dotenv
 from groq import Groq
+from flask import render_template
 
 load_dotenv()
 
