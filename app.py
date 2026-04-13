@@ -161,8 +161,7 @@ def build_messages(history, message, session):
 
 @app.route("/")
 def home():
-    return "✅ ENABLE AccessiBot server is running. Open index.html to use the chatbot."
-
+    return render_template("index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
