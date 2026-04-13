@@ -1,6 +1,5 @@
 """
 ENABLE AccessiBot – Evidence-led Testing Assistant (Groq-Powered)
-
 Uses Groq's free API with Llama 3 — no local downloads, no payment needed.
 """
 
@@ -14,6 +13,7 @@ from groq import Groq
 
 load_dotenv()
 
+# ── Single Flask app instance ──────────────
 app = Flask(__name__)
 CORS(app)
 
@@ -100,13 +100,6 @@ SCENARIOS = {
 # ─────────────────────────────────────────────
 # Utilities
 # ─────────────────────────────────────────────
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def home():
-    return "Server is running ✅"
 
 def utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
@@ -152,9 +145,23 @@ def build_user_message(message, session):
         f"[Tester message]\n{message}"
     )
 
+def build_messages(history, message, session):
+    """Build the full message list for Groq."""
+    msgs = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
+    for turn in history[-10:]:
+        if turn.get("role") in ("user", "assistant") and turn.get("content"):
+            msgs.append({"role": turn["role"], "content": turn["content"]})
+    msgs.append({"role": "user", "content": build_user_message(message, session)})
+    return msgs
+
 # ─────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────
+
+@app.route("/")
+def home():
+    return "✅ ENABLE AccessiBot server is running. Open index.html to use the chatbot."
+
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -176,18 +183,12 @@ def chat():
     if not message:
         return jsonify({"reply": "I didn't catch that — can you type it again?"})
 
-    messages = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
-    for turn in history[-10:]:
-        if turn.get("role") in ("user", "assistant") and turn.get("content"):
-            messages.append({"role": turn["role"], "content": turn["content"]})
-    messages.append({"role": "user", "content": build_user_message(message, session)})
-
     if client:
         try:
             response = client.chat.completions.create(
                 model="llama3-8b-8192",
                 max_tokens=600,
-                messages=messages,
+                messages=build_messages(history, message, session),
             )
             reply = response.choices[0].message.content.strip()
         except Exception as e:
@@ -218,41 +219,42 @@ def chat_stream():
 
     if not message:
         def err():
-            yield "data: I didn't catch that.\n\n"
+            yield "data: " + json.dumps({"token": "I didn't catch that."}) + "\n\n"
+            yield "data: " + json.dumps({"done": True}) + "\n\n"
         return Response(stream_with_context(err()), content_type="text/event-stream")
 
-    messages = [{"role": "system", "content": ENABLE_SYSTEM_PROMPT}]
-    for turn in history[-10:]:
-        if turn.get("role") in ("user", "assistant") and turn.get("content"):
-            messages.append({"role": turn["role"], "content": turn["content"]})
-    messages.append({"role": "user", "content": build_user_message(message, session)})
+    msgs = build_messages(history, message, session)
 
     def generate():
         full_reply = ""
+
         if client:
             try:
                 stream = client.chat.completions.create(
                     model="llama3-8b-8192",
                     max_tokens=600,
-                    messages=messages,
+                    messages=msgs,
                     stream=True,
                 )
                 for chunk in stream:
                     token = chunk.choices[0].delta.content or ""
                     if token:
-                        full_reply_ref = token
-                        yield f"data: {json.dumps({'token': token})}\n\n"
+                        full_reply_local = token  # noqa — just for reference
+                        full_reply += token
+                        yield "data: " + json.dumps({"token": token}) + "\n\n"
             except Exception as e:
                 fallback = offline_reply(message, session=session)
-                yield f"data: {json.dumps({'token': fallback})}\n\n"
                 full_reply = fallback
+                yield "data: " + json.dumps({"token": fallback}) + "\n\n"
         else:
             fallback = offline_reply(message, session=session)
-            yield f"data: {json.dumps({'token': fallback})}\n\n"
             full_reply = fallback
+            yield "data: " + json.dumps({"token": fallback}) + "\n\n"
 
-        yield f"data: {json.dumps({'done': True})}\n\n"
+        # Signal stream end
+        yield "data: " + json.dumps({"done": True}) + "\n\n"
 
+        # Log evidence
         try:
             append_jsonl(FEEDBACK_PATH, {
                 "type": "chat_message",
@@ -314,7 +316,7 @@ def feedback_download():
 
 
 if __name__ == "__main__":
-    mode = "AI — llama3-8b-8192 via Groq" if client else "OFFLINE (set GROQ_API_KEY in .env)"
+    mode = "AI — llama3-8b-8192 via Groq ✦" if client else "OFFLINE (add GROQ_API_KEY to .env)"
     print(f"\n✅ ENABLE AccessiBot running at http://127.0.0.1:5000")
     print(f"   Mode: {mode}\n")
     app.run(debug=True, port=5000)
