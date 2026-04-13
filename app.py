@@ -191,6 +191,7 @@ def chat():
                 messages=build_messages(history, message, session),
             )
             reply = response.choices[0].message.content.strip()
+print("AI reply:", reply)
         except Exception as e:
             reply = offline_reply(message, session=session)
             reply += f"\n\n(AI temporarily unavailable: {str(e)[:80]})"
