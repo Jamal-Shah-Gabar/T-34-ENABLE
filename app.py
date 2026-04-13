@@ -142,7 +142,7 @@ def health():
     return jsonify({
         "status": "ok",
         "mode": "ai" if client else "offline",
-        "model": "llama3-8b-8192 (Groq)" if client else "none",
+        "model": "llama-3.3-70b-versatile (Groq)" if client else "none",
         "ai_ready": client is not None,
     })
 
@@ -160,7 +160,7 @@ def chat():
     if client:
         try:
             response = client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.3-70b-versatile",
                 max_tokens=600,
                 messages=build_messages(history, message, session),
             )
@@ -208,7 +208,7 @@ def chat_stream():
         if client:
             try:
                 stream = client.chat.completions.create(
-                    model="llama3-8b-8192",
+                    model="llama-3.3-70b-versatile",
                     max_tokens=600,
                     messages=msgs,
                     stream=True,
@@ -291,7 +291,7 @@ def feedback_download():
 
 
 if __name__ == "__main__":
-    mode = "AI — llama3-8b-8192 via Groq ✦" if client else "OFFLINE (GROQ_API_KEY not set)"
+    mode = "AI — llama-3.3-70b-versatile via Groq ✦" if client else "OFFLINE (GROQ_API_KEY not set)"
     port = int(os.environ.get("PORT", 10000))
     print(f"\n✅ ENABLE AccessiBot running on port {port}")
     print(f"   Mode: {mode}\n", flush=True)
