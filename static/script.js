@@ -2,7 +2,7 @@
   ENABLE AccessiBot — Frontend Logic
   Co-created with Claude (Anthropic, 2025). Available at: https://claude.ai
 
-  Reference (Harvard):
+  Reference:
     Anthropic (2025) Claude [Large language model]. Available at:
     https://claude.ai (Accessed: April 2026).
 
