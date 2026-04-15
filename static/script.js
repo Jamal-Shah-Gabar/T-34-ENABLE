@@ -1,13 +1,23 @@
-/* ═══════════════════════════════════════════
-   ENABLE AccessiBot – script.js (AI-Powered)
-═══════════════════════════════════════════ */
+/*
+  ENABLE AccessiBot — Frontend Logic
+  Co-created with Claude (Anthropic, 2025). Available at: https://claude.ai
 
-// ── State ──────────────────────────────────
+  Reference (Harvard):
+    Anthropic (2025) Claude [Large language model]. Available at:
+    https://claude.ai (Accessed: April 2026).
+
+  Web Speech API reference:
+    Mozilla Developer Network (2024) Web Speech API. Available at:
+    https://developer.mozilla.org/en-US/docs/Web/API/Web_Speech_API
+    (Accessed: April 2026).
+*/
+
+// ── Application state ─────────────────────────────────────────────────────
 const state = {
-  ttsEnabled:      false,
+  ttsEnabled:    false,
   captionsEnabled: false,
-  sttActive:       false,
-  speechRate:      1,
+  sttActive:     false,
+  speechRate:    1,
 
   session: {
     role:     "Student",
@@ -15,83 +25,70 @@ const state = {
     scenario: "S1",
   },
 
-  history: [], // multi-turn conversation history
-
+  history:      [],   // multi-turn AI conversation history
   taskRunning:  false,
   taskStartMs:  null,
   tickTimer:    null,
-
-  backendOk:   false,
+  backendOk:    false,
   backendAiMode: false,
 
-  // ✅ KEY FIX: use the same origin the page was served from.
-  // When running on Render this becomes https://t-34-enable-1.onrender.com
-  // When running locally this becomes http://127.0.0.1:5000
-  // No hardcoded URL needed — works everywhere automatically.
+  // Auto-detects the server origin — works locally and on Render
   backendBase: window.location.origin,
 };
 
-// ── DOM refs ───────────────────────────────
+// ── DOM references ────────────────────────────────────────────────────────
 const chatMessages  = document.getElementById("chat-messages");
 const chatInput     = document.getElementById("chat-input");
 const btnSend       = document.getElementById("btn-send");
 const captionBar    = document.getElementById("caption-bar");
 const speedSelect   = document.getElementById("speed-select");
-
-const roleSelect     = document.getElementById("role-select");
-const systemSelect   = document.getElementById("system-select");
+const roleSelect    = document.getElementById("role-select");
+const systemSelect  = document.getElementById("system-select");
 const scenarioSelect = document.getElementById("scenario-select");
-
-const btnStart  = document.getElementById("btn-start");
-const btnFinish = document.getElementById("btn-finish");
-const btnReport = document.getElementById("btn-report");
-const btnExport = document.getElementById("btn-export");
-
-const timerText   = document.getElementById("timer-text");
-const backendText = document.getElementById("backend-text");
-
-const modalBackdrop  = document.getElementById("modal-backdrop");
-const issueModal     = document.getElementById("issue-modal");
-const btnCloseModal  = document.getElementById("btn-close-modal");
+const btnStart      = document.getElementById("btn-start");
+const btnFinish     = document.getElementById("btn-finish");
+const btnReport     = document.getElementById("btn-report");
+const btnExport     = document.getElementById("btn-export");
+const timerText     = document.getElementById("timer-text");
+const backendText   = document.getElementById("backend-text");
+const modalBackdrop = document.getElementById("modal-backdrop");
+const issueModal    = document.getElementById("issue-modal");
+const btnCloseModal = document.getElementById("btn-close-modal");
 const btnSubmitIssue = document.getElementById("btn-submit-issue");
-
-const issueUrl        = document.getElementById("issue-url");
-const issueCategory   = document.getElementById("issue-category");
-const issueSeverity   = document.getElementById("issue-severity");
-const issueWhat       = document.getElementById("issue-what");
-const issueExpected   = document.getElementById("issue-expected");
+const issueUrl      = document.getElementById("issue-url");
+const issueCategory = document.getElementById("issue-category");
+const issueSeverity = document.getElementById("issue-severity");
+const issueWhat     = document.getElementById("issue-what");
+const issueExpected = document.getElementById("issue-expected");
 const issueSuggestion = document.getElementById("issue-suggestion");
 
-// ── Local storage queue (offline fallback) ──
-const QUEUE_KEY = "enable_accessibot_feedback_queue";
+// ── Offline localStorage queue ────────────────────────────────────────────
+const QUEUE_KEY = "enable_accessibot_queue";
+
 function queueAdd(record) {
   const arr = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
   arr.push(record);
   localStorage.setItem(QUEUE_KEY, JSON.stringify(arr));
 }
+
 function queueGetAll() {
   return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]");
 }
 
-// ── Auto-resize textarea ───────────────────
+// ── Input events ──────────────────────────────────────────────────────────
 chatInput.addEventListener("input", () => {
   chatInput.style.height = "auto";
-  chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + "px";
 });
 
 chatInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
+
 btnSend.addEventListener("click", sendMessage);
+speedSelect.addEventListener("change", () => { state.speechRate = parseFloat(speedSelect.value); });
 
-speedSelect.addEventListener("change", () => {
-  state.speechRate = parseFloat(speedSelect.value);
-});
-
-// ── Session selectors ──────────────────────
+// ── Session selector events ───────────────────────────────────────────────
 roleSelect.addEventListener("change", () => {
   state.session.role = roleSelect.value;
   logEvent("scenario_change", { field: "role", value: state.session.role });
@@ -104,12 +101,12 @@ systemSelect.addEventListener("change", () => {
 
 scenarioSelect.addEventListener("change", () => {
   state.session.scenario = scenarioSelect.value;
-  state.history = []; // clear history on scenario change
+  state.history = [];
   logEvent("scenario_change", { field: "scenario", value: state.session.scenario });
-  appendMessage("bot", "Scenario changed — ask me anything about it, or type: show steps.");
+  appendMessage("bot", "Scenario changed — ask me anything about it, or click Start for guidance.");
 });
 
-// ── Button bindings ────────────────────────
+// ── Button bindings ───────────────────────────────────────────────────────
 btnStart.addEventListener("click", startTask);
 btnFinish.addEventListener("click", finishTask);
 btnReport.addEventListener("click", openModal);
@@ -117,12 +114,9 @@ btnExport.addEventListener("click", exportEvidence);
 btnCloseModal.addEventListener("click", closeModal);
 modalBackdrop.addEventListener("click", closeModal);
 btnSubmitIssue.addEventListener("click", submitIssue);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !issueModal.hidden) closeModal(); });
 
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !issueModal.hidden) closeModal();
-});
-
-// ── Backend health check ───────────────────
+// ── Backend health check — runs on load then every 30 seconds ─────────────
 (async function init() {
   await checkBackend();
   setInterval(checkBackend, 30000);
@@ -131,22 +125,20 @@ document.addEventListener("keydown", (e) => {
 async function checkBackend() {
   try {
     const res  = await fetch(state.backendBase + "/health");
-    if (!res.ok) throw new Error("not ok");
+    if (!res.ok) throw new Error();
     const data = await res.json();
-    state.backendOk     = true;
-    state.backendAiMode = data.mode === "ai";
+    state.backendOk      = true;
+    state.backendAiMode  = data.mode === "ai";
     backendText.textContent = state.backendAiMode
       ? "Backend: connected ✦ AI (Llama 3)"
-      : "Backend: connected (offline mode — API key missing on server)";
+      : "Backend: connected (offline mode — check GROQ_API_KEY)";
   } catch {
     state.backendOk = false;
     backendText.textContent = "Backend: not reachable";
   }
 }
 
-// ═══════════════════════════════════════════
-// CHAT
-// ═══════════════════════════════════════════
+// ── Send a message ────────────────────────────────────────────────────────
 async function sendMessage() {
   const text = chatInput.value.trim();
   if (!text) return;
@@ -154,8 +146,6 @@ async function sendMessage() {
   appendMessage("user", text);
   chatInput.value = "";
   chatInput.style.height = "auto";
-
-  // Add to history before sending
   state.history.push({ role: "user", content: text });
 
   const typingId = showTyping();
@@ -166,17 +156,14 @@ async function sendMessage() {
     state.history.push({ role: "assistant", content: reply });
     if (state.history.length > 20) state.history = state.history.slice(-20);
     appendMessage("bot", reply, true);
-    if (state.ttsEnabled)      speak(reply);
-    if (state.captionsEnabled) showCaption(reply);
-  } catch (err) {
+    if (state.ttsEnabled)       speak(reply);
+    if (state.captionsEnabled)  showCaption(reply);
+  } catch {
     removeTyping(typingId);
-    // Only show this if the backend is genuinely unreachable
-    const msg = "I couldn't reach the server. Please check your connection and try again.";
-    appendMessage("bot", msg, false);
+    appendMessage("bot", "I couldn't reach the server. Please check your connection and try again.", false);
   }
 }
 
-// POST to /chat and return the reply string
 async function fetchReply(message) {
   const res = await fetch(state.backendBase + "/chat", {
     method:  "POST",
@@ -184,7 +171,7 @@ async function fetchReply(message) {
     body: JSON.stringify({
       message,
       session: state.session,
-      history: state.history.slice(0, -1), // exclude the turn we just added
+      history: state.history.slice(0, -1),
     }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -192,9 +179,7 @@ async function fetchReply(message) {
   return data.reply;
 }
 
-// ═══════════════════════════════════════════
-// Evidence logging
-// ═══════════════════════════════════════════
+// ── Evidence logging ──────────────────────────────────────────────────────
 async function logEvent(type, payload) {
   const record = {
     type,
@@ -217,12 +202,10 @@ async function logEvent(type, payload) {
   }
 }
 
-// ═══════════════════════════════════════════
-// Task timing
-// ═══════════════════════════════════════════
+// ── Task timing ───────────────────────────────────────────────────────────
 function startTask() {
   if (state.taskRunning) {
-    appendMessage("bot", "Task already running — press Finish when you're done.", false);
+    appendMessage("bot", "Task is already running — press Finish when you're done.", false);
     return;
   }
 
@@ -230,24 +213,22 @@ function startTask() {
   state.taskStartMs = Date.now();
   timerText.textContent = "Running… 00:00";
   btnStart.classList.add("active");
-
   logEvent("task_start", { scenario: state.session.scenario });
 
-  // Ask the AI to guide them through the scenario
   chatInput.value = `I've just started scenario ${state.session.scenario} as a ${state.session.role} testing the ${state.session.system}. Please give me step-by-step guidance for this scenario.`;
   sendMessage();
 
   state.tickTimer = setInterval(() => {
     const sec = Math.floor((Date.now() - state.taskStartMs) / 1000);
-    const m   = String(Math.floor(sec / 60)).padStart(2, "0");
-    const s   = String(sec % 60).padStart(2, "0");
+    const m = String(Math.floor(sec / 60)).padStart(2, "0");
+    const s = String(sec % 60).padStart(2, "0");
     timerText.textContent = `Running… ${m}:${s}`;
   }, 1000);
 }
 
 function finishTask() {
   if (!state.taskRunning) {
-    appendMessage("bot", "No task running — click Start to begin.", false);
+    appendMessage("bot", "No task is running — click Start to begin.", false);
     return;
   }
 
@@ -255,17 +236,14 @@ function finishTask() {
   clearInterval(state.tickTimer);
   state.taskRunning = false;
   btnStart.classList.remove("active");
-  timerText.textContent = `Finished (${sec}s)`;
-
+  timerText.textContent = `Finished in ${sec}s`;
   logEvent("task_finish", { scenario: state.session.scenario, duration_sec: sec });
 
   chatInput.value = `I've finished the scenario. It took ${sec} seconds. Can you give me a brief summary of the key things I should have checked, and any common issues testers find in this scenario?`;
   sendMessage();
 }
 
-// ═══════════════════════════════════════════
-// Issue modal
-// ═══════════════════════════════════════════
+// ── Issue modal ───────────────────────────────────────────────────────────
 function openModal() {
   modalBackdrop.hidden = false;
   issueModal.hidden    = false;
@@ -296,19 +274,16 @@ async function submitIssue() {
   await logEvent("accessibility_issue", payload);
   closeModal();
 
-  issueUrl.value        = "";
-  issueWhat.value       = "";
-  issueExpected.value   = "";
+  issueUrl.value = "";
+  issueWhat.value = "";
+  issueExpected.value = "";
   issueSuggestion.value = "";
 
-  // Ask the AI for an improvement recommendation based on the issue
-  chatInput.value = `I just reported a ${payload.severity} ${payload.category} issue: "${payload.what}". What they expected: "${payload.expected || 'not specified'}". Can you suggest a brief improvement recommendation for the ENABLE evidence report?`;
+  chatInput.value = `I just reported a ${payload.severity} ${payload.category} issue: "${payload.what}". What they expected: "${payload.expected || "not specified"}". Can you suggest a brief improvement recommendation for the ENABLE evidence report?`;
   sendMessage();
 }
 
-// ═══════════════════════════════════════════
-// Export evidence
-// ═══════════════════════════════════════════
+// ── Export evidence ───────────────────────────────────────────────────────
 async function exportEvidence() {
   if (state.backendOk) {
     window.open(state.backendBase + "/feedback/download", "_blank");
@@ -318,16 +293,17 @@ async function exportEvidence() {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement("a");
-  a.href = url; a.download = "enable_evidence_local.json";
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = "enable_evidence_local.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
-// ═══════════════════════════════════════════
-// DOM helpers
-// ═══════════════════════════════════════════
+// ── DOM helpers ───────────────────────────────────────────────────────────
 function appendMessage(sender, text, addActions = false) {
-  const row    = document.createElement("div");
+  const row = document.createElement("div");
   row.classList.add("message", sender);
   row.setAttribute("data-sender", sender);
 
@@ -353,11 +329,13 @@ function appendMessage(sender, text, addActions = false) {
 
     const btnUp = makeChip("👍 Helpful", async () => {
       await logEvent("quick_feedback", { helpful: true });
-      btnUp.textContent = "👍 Saved"; btnUp.disabled = true;
+      btnUp.textContent = "👍 Saved";
+      btnUp.disabled = true;
     });
     const btnDown = makeChip("👎 Not helpful", async () => {
       await logEvent("quick_feedback", { helpful: false });
-      btnDown.textContent = "👎 Saved"; btnDown.disabled = true;
+      btnDown.textContent = "👎 Saved";
+      btnDown.disabled = true;
     });
     const btnIssue = makeChip("⚑ Report issue", () => openModal(), true);
 
@@ -375,8 +353,8 @@ function appendMessage(sender, text, addActions = false) {
 
 function makeChip(label, onClick, warn = false) {
   const btn = document.createElement("button");
-  btn.className   = "action-chip" + (warn ? " warn" : "");
-  btn.type        = "button";
+  btn.className = "action-chip" + (warn ? " warn" : "");
+  btn.type = "button";
   btn.textContent = label;
   btn.addEventListener("click", onClick);
   return btn;
@@ -414,21 +392,17 @@ function scrollToBottom() {
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-// ═══════════════════════════════════════════
-// Text-to-speech
-// ═══════════════════════════════════════════
+// ── Text-to-speech ────────────────────────────────────────────────────────
 function speak(text) {
   if (!("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
-  const utt  = new SpeechSynthesisUtterance(text);
-  utt.rate   = state.speechRate;
-  utt.lang   = "en-GB";
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.rate  = state.speechRate;
+  utt.lang  = "en-GB";
   window.speechSynthesis.speak(utt);
 }
 
-// ═══════════════════════════════════════════
-// Captions
-// ═══════════════════════════════════════════
+// ── Caption bar ───────────────────────────────────────────────────────────
 function showCaption(text) {
   captionBar.removeAttribute("hidden");
   captionBar.textContent = "🗣 " + text;
@@ -439,9 +413,7 @@ function showCaption(text) {
   }, 8000);
 }
 
-// ═══════════════════════════════════════════
-// Speech-to-text
-// ═══════════════════════════════════════════
+// ── Speech-to-text ────────────────────────────────────────────────────────
 let recognition = null;
 const sttBtn = document.getElementById("btn-stt");
 
@@ -460,15 +432,15 @@ if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
   recognition.onend = () => {
     state.sttActive = false;
     sttBtn.classList.remove("active");
-    sttBtn.textContent = "🎙 Voice Input";
+    sttBtn.textContent = "🎙 Voice input";
   };
-  recognition.onerror = (e) => {
+  recognition.onerror = () => {
     state.sttActive = false;
     sttBtn.classList.remove("active");
-    sttBtn.textContent = "🎙 Voice Input";
+    sttBtn.textContent = "🎙 Voice input";
   };
 } else {
-  sttBtn.disabled   = true;
+  sttBtn.disabled    = true;
   sttBtn.textContent = "🎙 Not supported";
 }
 
@@ -480,42 +452,41 @@ function toggleSTT() {
     recognition.start();
     state.sttActive = true;
     sttBtn.classList.add("active");
-    sttBtn.textContent = "⏹ Stop Listening";
+    sttBtn.textContent = "⏹ Stop listening";
   }
 }
 
-// ═══════════════════════════════════════════
-// Accessibility controls
-// ═══════════════════════════════════════════
+// ── Accessibility controls ────────────────────────────────────────────────
 let fontSize = 16;
-function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 document.getElementById("btn-zoom-in").addEventListener("click", () => {
-  fontSize = clamp(fontSize + 2, 12, 28);
-  document.documentElement.style.setProperty("--font-size", fontSize + "px");
-});
-document.getElementById("btn-zoom-out").addEventListener("click", () => {
-  fontSize = clamp(fontSize - 2, 12, 28);
+  fontSize = clamp(fontSize + 2, 12, 30);
   document.documentElement.style.setProperty("--font-size", fontSize + "px");
 });
 
-function toggleClass(btn, cls) {
+document.getElementById("btn-zoom-out").addEventListener("click", () => {
+  fontSize = clamp(fontSize - 2, 12, 30);
+  document.documentElement.style.setProperty("--font-size", fontSize + "px");
+});
+
+function toggleBodyClass(btn, cls) {
   document.body.classList.toggle(cls);
   btn.classList.toggle("active");
 }
 
-document.getElementById("btn-contrast").addEventListener("click", function () { toggleClass(this, "high-contrast"); });
-document.getElementById("btn-dyslexia").addEventListener("click", function () { toggleClass(this, "dyslexia-font"); });
-document.getElementById("btn-focus").addEventListener("click",    function () { toggleClass(this, "focus-mode"); });
+document.getElementById("btn-contrast").addEventListener("click", function() { toggleBodyClass(this, "high-contrast"); });
+document.getElementById("btn-dyslexia").addEventListener("click", function() { toggleBodyClass(this, "dyslexia-font"); });
+document.getElementById("btn-focus").addEventListener("click",    function() { toggleBodyClass(this, "focus-mode"); });
 
-document.getElementById("btn-tts").addEventListener("click", function () {
+document.getElementById("btn-tts").addEventListener("click", function() {
   state.ttsEnabled = !state.ttsEnabled;
   this.classList.toggle("active", state.ttsEnabled);
-  this.textContent = state.ttsEnabled ? "🔇 Stop Read Aloud" : "▶ Read Aloud";
+  this.textContent = state.ttsEnabled ? "🔇 Stop reading" : "▶ Read aloud";
   if (!state.ttsEnabled) window.speechSynthesis?.cancel();
 });
 
-document.getElementById("btn-captions").addEventListener("click", function () {
+document.getElementById("btn-captions").addEventListener("click", function() {
   state.captionsEnabled = !state.captionsEnabled;
   this.classList.toggle("active", state.captionsEnabled);
   if (!state.captionsEnabled) {
@@ -527,10 +498,12 @@ document.getElementById("btn-captions").addEventListener("click", function () {
 sttBtn.addEventListener("click", toggleSTT);
 
 document.getElementById("btn-clear").addEventListener("click", () => {
-  if (!confirm("Clear conversation history?")) return;
+  if (!confirm("Clear all messages and start fresh?")) return;
   chatMessages.innerHTML = "";
   state.history = [];
   window.speechSynthesis?.cancel();
   captionBar.setAttribute("hidden", "");
   timerText.textContent = "Not started";
+  fontSize = 16;
+  document.documentElement.style.setProperty("--font-size", "16px");
 });
