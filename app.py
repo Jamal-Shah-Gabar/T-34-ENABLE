@@ -1,6 +1,14 @@
 """
-ENABLE AccessiBot – Evidence-led Testing Assistant (Groq-Powered)
-Uses Groq's free API with Llama 3 — no local downloads, no payment needed.
+ENABLE AccessiBot — Flask Backend
+Co-created with Claude (Anthropic, 2025). Available at: https://claude.ai
+
+Reference (Harvard):
+  Anthropic (2025) Claude [Large language model]. Available at:
+  https://claude.ai (Accessed: April 2026).
+
+AI model: Groq API — Llama 3.3 70B Versatile (free tier).
+Groq (2025) Groq API Documentation. Available at:
+  https://console.groq.com/docs (Accessed: April 2026).
 """
 
 import os
@@ -13,7 +21,6 @@ from groq import Groq
 
 load_dotenv()
 
-# ── Single Flask app instance ──────────────
 app = Flask(__name__)
 CORS(app)
 
@@ -25,9 +32,7 @@ try:
 except Exception:
     client = None
 
-# ─────────────────────────────────────────────
-# ENABLE System Prompt
-# ─────────────────────────────────────────────
+# ── System prompt — defines the AI's full ENABLE context ──────────────────
 
 ENABLE_SYSTEM_PROMPT = """You are ENABLE AccessiBot, a warm and knowledgeable AI accessibility testing assistant for the ENABLE project at the University of Bradford (UoB).
 
@@ -73,12 +78,12 @@ Help testers notice and report issues across four areas:
 - Always frame your guidance in the context of the ENABLE project — collecting evidence to drive real change in HE accessibility.
 """
 
-# ─────────────────────────────────────────────
-# Utilities
-# ─────────────────────────────────────────────
+
+# ── Utility functions ─────────────────────────────────────────────────────
 
 def utc_now_iso():
     return datetime.now(timezone.utc).isoformat()
+
 
 def safe_load_json(request_obj):
     try:
@@ -86,23 +91,26 @@ def safe_load_json(request_obj):
     except Exception:
         return {}
 
+
 def append_jsonl(path, record):
     record.setdefault("ts", utc_now_iso())
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
+
 def offline_reply(session=None):
     role     = (session or {}).get("role", "tester")
     scenario = (session or {}).get("scenario", "S1")
     return (
-        f"Hi {role}! I'm currently running in offline mode — the AI connection isn't configured yet.\n\n"
-        f"You have selected scenario {scenario}. "
+        f"Hi {role}! I'm in offline mode right now — no AI connection found.\n\n"
+        f"You've selected scenario {scenario}. "
         "To get full AI guidance, please make sure the GROQ_API_KEY environment variable is set on the server.\n\n"
-        "In the meantime, you can still log accessibility issues using the 'Report issue' button."
+        "You can still log accessibility issues using the 'Report issue' button."
     )
 
+
 def build_messages(history, message, session):
-    """Build the full message list for Groq, injecting session context."""
+    """Assemble the full message list with ENABLE context for Groq."""
     scenario_labels = {
         "S1": "S1 – Find EPMS course/module information",
         "S2": "S2 – Use intranet search to find a staff/contact page",
@@ -127,13 +135,11 @@ def build_messages(history, message, session):
     msgs.append({"role": "user", "content": contextualised})
     return msgs
 
-# ─────────────────────────────────────────────
-# Routes
-# ─────────────────────────────────────────────
+
+# ── Routes ────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def home():
-    # Serve index.html from templates/ folder
     return render_template("index.html")
 
 
@@ -165,13 +171,13 @@ def chat():
                 messages=build_messages(history, message, session),
             )
             reply = response.choices[0].message.content.strip()
-            print(f"[AI] replied ok, length={len(reply)}", flush=True)
+            print(f"[AI] ok, {len(reply)} chars", flush=True)
         except Exception as e:
             print(f"[AI ERROR] {e}", flush=True)
             reply = offline_reply(session=session)
             reply += f"\n\n(AI error: {str(e)[:120]})"
     else:
-        print("[WARN] No Groq client — GROQ_API_KEY not set", flush=True)
+        print("[WARN] GROQ_API_KEY not set", flush=True)
         reply = offline_reply(session=session)
 
     try:
@@ -204,7 +210,6 @@ def chat_stream():
 
     def generate():
         full_reply = ""
-
         if client:
             try:
                 stream = client.chat.completions.create(
@@ -291,8 +296,7 @@ def feedback_download():
 
 
 if __name__ == "__main__":
-    mode = "AI — llama-3.3-70b-versatile via Groq ✦" if client else "OFFLINE (GROQ_API_KEY not set)"
+    mode = "AI — llama-3.3-70b-versatile via Groq" if client else "OFFLINE (GROQ_API_KEY not set)"
     port = int(os.environ.get("PORT", 10000))
-    print(f"\n✅ ENABLE AccessiBot running on port {port}")
-    print(f"   Mode: {mode}\n", flush=True)
+    print(f"\n✅ ENABLE AccessiBot — port {port}  |  {mode}\n", flush=True)
     app.run(host="0.0.0.0", port=port)
