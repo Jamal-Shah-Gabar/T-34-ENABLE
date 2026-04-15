@@ -1,165 +1,226 @@
 <!DOCTYPE html>
+<!--
+  ENABLE AccessiBot — Interface
+  Co-created with Claude (Anthropic, 2025). Available at: https://claude.ai
 
+  Reference (Harvard):
+    Anthropic (2025) Claude [Large language model]. Available at:
+    https://claude.ai (Accessed: April 2026).
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ENABLE AccessiBot – Evidence-led Testing Tool</title>
-
-  <!-- ✅ FIXED: Flask static path -->
-
+  <title>ENABLE AccessiBot</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
-
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 </head>
 <body>
 
-<a href="#chat-input" class="skip-link">Skip to chat input</a>
+  <a href="#chat-input" class="skip-link">Skip to chat input</a>
 
   <div class="app-shell" role="main">
 
-```
-<!-- ── SIDEBAR ── -->
-<aside class="sidebar" aria-label="Accessibility Controls">
-  <div class="sidebar-brand">
-    <span class="brand-icon" aria-hidden="true">◈</span>
-    <span class="brand-name">ENABLE AccessiBot</span>
-  </div>
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" aria-label="Accessibility Controls">
 
-  <section class="control-group">
-    <h2 class="group-title">👁 Vision</h2>
-    <button class="ctrl-btn" id="btn-zoom-in">A+ Larger Text</button>
-    <button class="ctrl-btn" id="btn-zoom-out">A− Smaller Text</button>
-    <button class="ctrl-btn" id="btn-contrast">⬛ High Contrast</button>
-    <button class="ctrl-btn" id="btn-dyslexia">Aa Dyslexia Font</button>
-  </section>
-
-  <section class="control-group">
-    <h2 class="group-title">🔊 Hearing</h2>
-    <button class="ctrl-btn" id="btn-tts">▶ Read Aloud</button>
-    <button class="ctrl-btn" id="btn-captions">CC Captions</button>
-    <label for="speed-select">Speech Speed</label>
-    <select id="speed-select">
-      <option value="0.75">Slow</option>
-      <option value="1" selected>Normal</option>
-      <option value="1.5">Fast</option>
-    </select>
-  </section>
-
-  <section class="control-group">
-    <h2 class="group-title">🖱 Motor</h2>
-    <button class="ctrl-btn" id="btn-stt">🎙 Voice Input</button>
-    <button class="ctrl-btn" id="btn-focus">🎯 Focus Mode</button>
-  </section>
-
-  <div class="sidebar-footer">
-    <button class="ctrl-btn danger" id="btn-clear">🗑 Clear Chat</button>
-  </div>
-</aside>
-
-<!-- ── CHAT PANEL ── -->
-<div class="chat-panel">
-
-  <header class="chat-header">
-    <div>
-      <span id="status-text">ENABLE AccessiBot</span>
-    </div>
-    <span class="tag">Evidence-led Testing</span>
-  </header>
-
-  <!-- Session Bar -->
-  <div class="session-bar">
-    <div class="session-grid">
-
-      <select id="role-select">
-        <option value="Student" selected>Student</option>
-        <option value="Teaching Staff">Teaching Staff</option>
-        <option value="IT Staff">IT Staff</option>
-      </select>
-
-      <select id="system-select">
-        <option value="UoB Intranet" selected>UoB Intranet</option>
-        <option value="UoB Website">UoB Website</option>
-      </select>
-
-      <select id="scenario-select">
-        <option value="S1" selected>S1</option>
-        <option value="S2">S2</option>
-        <option value="S3">S3</option>
-        <option value="S4">S4</option>
-      </select>
-
-      <button id="btn-start">▶ Start</button>
-      <button id="btn-finish">✓ Finish</button>
-      <button id="btn-report">⚑ Report</button>
-      <button id="btn-export">⬇ Export</button>
-
-    </div>
-
-    <div>
-      <span id="timer-text">Not started</span> •
-      <span id="backend-text">Checking…</span>
-    </div>
-  </div>
-
-  <!-- Messages -->
-  <div id="chat-messages" class="chat-messages">
-    <div class="message bot">
-      <div class="bubble">
-        <p><strong>Hi 👋</strong> I’m ENABLE AccessiBot.</p>
-        <p>Click <strong>Start</strong> and begin your accessibility test.</p>
+      <div class="sidebar-brand">
+        <div class="brand-mark" aria-hidden="true">◈</div>
+        <div>
+          <div class="brand-name">AccessiBot</div>
+          <div class="brand-sub">ENABLE Project</div>
+        </div>
       </div>
+
+      <nav class="sidebar-nav" aria-label="Accessibility settings">
+
+        <div class="control-group">
+          <p class="group-title">👁 Vision</p>
+          <button class="ctrl-btn" id="btn-zoom-in"  aria-label="Increase text size">A+ Bigger text</button>
+          <button class="ctrl-btn" id="btn-zoom-out" aria-label="Decrease text size">A− Smaller text</button>
+          <button class="ctrl-btn" id="btn-contrast" aria-label="Toggle high contrast mode">⬛ High contrast</button>
+          <button class="ctrl-btn" id="btn-dyslexia" aria-label="Toggle dyslexia-friendly font">Aa Dyslexia font</button>
+        </div>
+
+        <div class="control-group">
+          <p class="group-title">🔊 Hearing</p>
+          <button class="ctrl-btn" id="btn-tts"     aria-label="Toggle text to speech">▶ Read aloud</button>
+          <button class="ctrl-btn" id="btn-captions" aria-label="Toggle live captions">CC Captions</button>
+          <label class="speed-label" for="speed-select">Speed</label>
+          <select id="speed-select" class="ctrl-select" aria-label="Speech speed">
+            <option value="0.75">🐢 Slow</option>
+            <option value="1" selected>▶ Normal</option>
+            <option value="1.5">⚡ Fast</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <p class="group-title">🖱 Motor</p>
+          <button class="ctrl-btn" id="btn-stt"   aria-label="Start voice input">🎙 Voice input</button>
+          <button class="ctrl-btn" id="btn-focus" aria-label="Toggle focus mode">🎯 Focus mode</button>
+        </div>
+
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="ctrl-btn danger" id="btn-clear" aria-label="Clear chat history">🗑 Clear chat</button>
+      </div>
+    </aside>
+
+    <!-- ── MAIN CHAT ── -->
+    <div class="chat-panel">
+
+      <header class="chat-header" role="banner">
+        <div class="header-left">
+          <div class="status-dot" aria-hidden="true"></div>
+          <span id="status-text" class="header-title">ENABLE AccessiBot</span>
+        </div>
+        <span class="tag">Evidence-led Testing</span>
+      </header>
+
+      <!-- Session bar -->
+      <div class="session-bar" role="region" aria-label="Test session controls">
+        <div class="session-selects">
+
+          <div class="sel-group">
+            <label for="role-select">My role</label>
+            <select id="role-select">
+              <option value="Student" selected>Student</option>
+              <option value="Teaching Staff">Teaching Staff</option>
+              <option value="IT Staff">IT Staff</option>
+            </select>
+          </div>
+
+          <div class="sel-group">
+            <label for="system-select">System</label>
+            <select id="system-select">
+              <option value="UoB Intranet" selected>UoB Intranet</option>
+              <option value="UoB Website">UoB Website</option>
+            </select>
+          </div>
+
+          <div class="sel-group">
+            <label for="scenario-select">Scenario</label>
+            <select id="scenario-select">
+              <option value="S1" selected>S1 – EPMS info</option>
+              <option value="S2">S2 – Search staff</option>
+              <option value="S3">S3 – Download PDF</option>
+              <option value="S4">S4 – Navigation</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div class="session-actions">
+          <button class="action-btn start"  id="btn-start">▶ Start</button>
+          <button class="action-btn finish" id="btn-finish">✓ Finish</button>
+          <button class="action-btn report" id="btn-report">⚑ Report issue</button>
+          <button class="action-btn export" id="btn-export">⬇ Export</button>
+        </div>
+
+        <div class="session-meta" aria-live="polite">
+          <span id="timer-text">Not started</span>
+          <span class="dot" aria-hidden="true">•</span>
+          <span id="backend-text">Checking…</span>
+        </div>
+      </div>
+
+      <!-- Chat messages -->
+      <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Conversation" tabindex="0">
+        <div class="message bot">
+          <div class="avatar" aria-hidden="true">◈</div>
+          <div class="bubble">
+            <p><strong>Hi 👋 I'm ENABLE AccessiBot.</strong></p>
+            <p>I'll guide you through accessibility testing on the UoB intranet. Pick your role and scenario above, then click <strong>Start</strong>.</p>
+            <p>When you find a barrier, click <strong>⚑ Report issue</strong> and I'll help you log it.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live captions -->
+      <div id="caption-bar" class="caption-bar" aria-live="assertive" aria-label="Live captions" hidden></div>
+
+      <!-- Input area — made larger for neurodiverse users -->
+      <div class="chat-input-area" role="form" aria-label="Send a message">
+        <textarea
+          id="chat-input"
+          class="chat-textarea"
+          placeholder="Type your message here… (press Enter to send, Shift+Enter for a new line)"
+          rows="2"
+          aria-label="Message input"
+          aria-multiline="true"
+        ></textarea>
+        <button class="send-btn" id="btn-send" aria-label="Send message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+          <span class="send-label">Send</span>
+        </button>
+      </div>
+
     </div>
   </div>
 
-  <div id="caption-bar" hidden></div>
+  <!-- ── REPORT ISSUE MODAL ── -->
+  <div class="modal-backdrop" id="modal-backdrop" hidden></div>
 
-  <!-- Input -->
-  <div class="chat-input-area">
-    <textarea id="chat-input" placeholder="Type your message…"></textarea>
-    <button id="btn-send">Send</button>
+  <div class="modal" id="issue-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <div class="modal-head">
+      <h2 id="modal-title">⚑ Report an accessibility issue</h2>
+      <button class="modal-close" id="btn-close-modal" aria-label="Close modal">✕</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-row">
+        <label for="issue-url">Page URL <span class="optional">(paste it here)</span></label>
+        <input id="issue-url" type="text" placeholder="https://…" />
+      </div>
+
+      <div class="form-row two">
+        <div>
+          <label for="issue-category">Category</label>
+          <select id="issue-category">
+            <option value="Vision">👁 Vision</option>
+            <option value="Hearing">🔊 Hearing</option>
+            <option value="Motor">🖱 Motor</option>
+            <option value="Neurodiversity" selected>🧠 Neurodiversity</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="issue-severity">How bad is it?</label>
+          <select id="issue-severity">
+            <option value="Minor">Minor — annoying</option>
+            <option value="Major" selected>Major — hard to use</option>
+            <option value="Blocker">Blocker — can't continue</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label for="issue-what">What happened? <span class="required">*</span></label>
+        <textarea id="issue-what" rows="3" placeholder="Describe the barrier in plain language…"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="issue-expected">What did you expect instead?</label>
+        <textarea id="issue-expected" rows="2" placeholder="What should have happened?"></textarea>
+      </div>
+
+      <div class="form-row">
+        <label for="issue-suggestion">Any suggestions? <span class="optional">(optional)</span></label>
+        <textarea id="issue-suggestion" rows="2" placeholder="How could it be improved?"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="action-btn report" id="btn-submit-issue">Submit issue</button>
+      </div>
+
+      <p class="modal-note">This logs your evidence to the ENABLE dataset. It does not change the UoB intranet itself.</p>
+    </div>
   </div>
-
-</div>
-```
-
-  </div>
-
-  <!-- Modal -->
-
-  <div id="modal-backdrop" hidden></div>
-
-  <div id="issue-modal" hidden>
-    <h2>Report Issue</h2>
-
-```
-<input id="issue-url" placeholder="URL" />
-<select id="issue-category">
-  <option>Vision</option>
-  <option>Hearing</option>
-  <option>Motor</option>
-  <option>Neurodiversity</option>
-</select>
-
-<select id="issue-severity">
-  <option>Minor</option>
-  <option>Major</option>
-  <option>Blocker</option>
-</select>
-
-<textarea id="issue-what" placeholder="What happened?"></textarea>
-<textarea id="issue-expected" placeholder="Expected?"></textarea>
-<textarea id="issue-suggestion" placeholder="Suggestion"></textarea>
-
-<button id="btn-submit-issue">Submit</button>
-<button id="btn-close-modal">Close</button>
-```
-
-  </div>
-
-  <!-- ✅ FIXED: Flask static JS -->
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>
-
 </body>
 </html>
